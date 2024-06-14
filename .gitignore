@@ -1,0 +1,29 @@
+# Environment
+env/
+backend/.env
+backend/.env-prod
+
+# Database
+db.sqlite3
+
+# Static files
+static/
+
+# Media files
+media/
+
+# Pycache
+*.pyc
+*__pycache__/*
+
+# VScode
+.vscode/settings.json
+
+# DS_Store
+**/.DS_Store
+
+# AWS
+japanese_text_analyser.pem
+
+# .idea
+.idea/*
