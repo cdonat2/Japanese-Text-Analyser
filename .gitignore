@@ -27,3 +27,6 @@ japanese_text_analyser.pem
 
 # .idea
 .idea/*
+
+# SSH
+backend/ssh/*
