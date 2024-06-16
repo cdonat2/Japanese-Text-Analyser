@@ -663,20 +663,6 @@ Restart the NGINX Web Server with:
 
 Test with browser: http://44.207.132.103
 
-
-# todo: write ansible script that automates these steps.
-# todo: create anki cards
-#	nginxs
-#	gunicorn
-#	systemd service and socket files
-#	wsgi
-#	www-data https://www.digitalocean.com/community/tutorials/how-to-set-up-django-with-postgres-nginx-and-gunicorn-on-ubuntu#step-3-creating-a-python-virtual-environment-for-your-project
-#	ci/cd
-#	ssm and ssm agents
-# todo: check how to deal with dynamic ips
-# todo: add ssl/tls certificate
-# todo: create iam security access key instead of root access key
-
 Now if you go to your Elastic IP on your browser it should show the app!
 
 [Back to Table of Contents](#table-of-contents)
