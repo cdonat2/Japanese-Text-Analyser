@@ -30,3 +30,6 @@ japanese_text_analyser.pem
 
 # SSH
 backend/ssh/*
+
+# Github
+backend/secrets

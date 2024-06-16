@@ -248,8 +248,6 @@ Set your Security Group settings with the following:
 As you can see with the warning near the bottom of the screen, you do not want to set your *SSH Source IP* as anywhere. This will create a security vulnerability as anyone can try to attempt to log into your server.
 
 Therefore, be sure to set it to your own IP address and any other IP address which may need access to the instance.
-
-Own IP: 83.135.108/32
 Note: Set to all ipv4 because of dynamic public ip
 ---
 
@@ -453,7 +451,49 @@ Recall the steps earlier we did with the dummy project on our local machine. We 
 % python3 manage.py collectstatic
 ```
 
-**Note: Make sure to update your .env file so that your project has the correct Environment Varialbes necessary to run.**
+Note: Use own repository with adjusted requirements.txt
+Copy private ssh key to server
+
+```
+git clone git@github.com:cdonat2/Japanese-Text-Analyser.git
+mv Japanese-Text-Analyser japanese_text_analyser
+cd japanese_text_analyser
+python3 -m venv japanese_text_analyser_env
+source japanese_text_analyser_env/bin/activate
+pip3 install -r requirements.txt
+```
+Copy .env files to server
+
+```
+```
+
+```
+python3 manage.py makemigrations
+python3 manage.py migrate
+python3 manage.py collectstatic
+```
+
+**Note: Make sure to update your .env file so that your project has the correct Environment Variables necessary to run.**
+
+Test initial setup
+```
+pip install django gunicorn psycopg2-binary
+sudo ufw allow 8000
+```
+
+Test connection
+```
+python manage.py runserver 0.0.0.0:8000
+```
+
+Open in browser with http://44.207.132.103:8000/admin/login/?next=/admin/
+
+Test gunicorn
+```
+gunicorn --bin 0.0.0:8000 backend.wsgi
+```
+
+Open in browser with http://44.207.132.103:8000/admin/login/?next=/admin/
 
 ---
 
@@ -507,6 +547,28 @@ ExecStart=/home/djangoadmin/pyapps/venv/bin/gunicorn \
 WantedBy=multi-user.target
 ```
 
+# Note adjusted service file
+```
+[Unit]
+Description=gunicorn daemon
+Requires=gunicorn.socket
+After=network.target
+
+[Service]
+User=ubuntu
+Group=www-data
+WorkingDirectory=/home/ubuntu/japanese_text_analyser
+ExecStart=/home/ubuntu/japanese_text_analyser/japanese_text_analyser_env/bin/gunicorn \
+        --access-logfile - \
+        --workers 3 \
+        --bind unix:/run/gunicorn.sock \
+        backend.wsgi:application
+
+[Install]
+WantedBy=multi-user.target
+```
+
+
 Start and enable Gunicorn:
 
 ```
@@ -519,6 +581,11 @@ Check the status of gunicorn with:
 ```
 % sudo systemctl status gunicorn.socket
 ```
+
+Test socket activation
+sudo systemctl status gunicorn -> inactive
+curl --unix-socket /run/gunicorn.sock localhost
+sudo systemctl status gunicorn -> running
 
 ---
 
@@ -555,6 +622,27 @@ proxy_pass http://unix:/run/gunicorn.sock;
 }
 ```
 
+```
+server {
+        listen 80;
+        server_name 44.207.132.103;
+
+        location = /favicon.ico { access_log off; log_not_found off; }
+        location /static/ {
+        root /home/ubuntu/japanese_text_analyser;
+        }
+
+        location /media/ {
+        root /home/ubuntu/japanese_text_analyser;    
+        }
+
+        location / {
+        include proxy_params;
+        proxy_pass http://unix:/run/gunicorn.sock;
+        }
+}
+```
+
 Once your NGINX config is set up, make sure there are no syntax errors with:
 
 ```
@@ -572,6 +660,22 @@ Restart the NGINX Web Server with:
 ```
 % sudo systemctl restart nginx
 ```
+
+Test with browser: http://44.207.132.103
+
+
+# todo: write ansible script that automates these steps.
+# todo: create anki cards
+#	nginxs
+#	gunicorn
+#	systemd service and socket files
+#	wsgi
+#	www-data https://www.digitalocean.com/community/tutorials/how-to-set-up-django-with-postgres-nginx-and-gunicorn-on-ubuntu#step-3-creating-a-python-virtual-environment-for-your-project
+#	ci/cd
+#	ssm and ssm agents
+# todo: check how to deal with dynamic ips
+# todo: add ssl/tls certificate
+# todo: create iam security access key instead of root access key
 
 Now if you go to your Elastic IP on your browser it should show the app!
 
@@ -613,8 +717,8 @@ Once you have the **Role** created:
   - Go to the **Instances** link
   - Highlight the Instance
   - Click on **Actions**
-  - **Instance Settings**
-  - **Attach/Replace IAM Role**
+  - **Security**
+  - **Modify IAM Role**
   - Select the SSM Role you had created earlier
   - Hit **Apply** to save changes
 
@@ -624,7 +728,9 @@ Once you have the **Role** created:
 
 With our instance being able to use the SSM Agent, we will need to provide it some details so that it can access our EC2 instance.
 
-Now that the instance is able to communicate to Github via SSM Agent, you will need to provide the repo with credentials. Github Secrets act like environment variables for repositories and store sensitive data such as AWS login information. In order for the Github Actions script to work, it needs these three secrets: AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY, and INSTANCE_ID.
+Now that the instance is able to communicate to Github via SSM Agent, you will need to provide the repo with credentials.
+Github Secrets act like environment variables for repositories and store sensitive data such as AWS login information.
+In order for the Github Actions script to work, it needs these three secrets: AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY, and INSTANCE_ID.
 
 There is an article by AWS on how to find your AWS Access Key and Secret Access Key [here](https://docs.aws.amazon.com/general/latest/gr/aws-sec-cred-types.html#access-keys-and-secret-access-keys). Your instance ID is shown on your instances tab under EC2.
 
@@ -689,31 +795,31 @@ start:
 runs-on: ubuntu-latest 
 
 steps:
-			  - uses: actions/checkout@v2
+	- uses: actions/checkout@v2
+	
+	- name: AWS SSM Send Command
+	uses: peterkimzz/aws-ssm-send-command@1.0.1
+	with:
+	aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID  }}
+	aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY  }}
+	aws-region: us-east-1
+	instance-ids: ${{ secrets.INSTANCE_ID  }}
+	comment: Deploy the master branch
+	working-directory: /home/ubuntu/japanese_text_analyser
+	command: /bin/sh ./deploy.sh
+```
 
-			  - name: AWS SSM Send Command
-			  uses: peterkimzz/aws-ssm-send-command@1.0.1
-			  with:
-			  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID  }}
-			  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY  }}
-			  aws-region: us-east-1
-			  instance-ids: ${{ secrets.INSTANCE_ID  }}
-			  comment: Deploy the master branch
-			  working-directory: /home/ubuntu/<YOUR PROJECT DIRECTORY>
-			  command: /bin/sh ./deploy.sh
-			  ```
+The Secrets we provided to the repo earlier comes into use in this script.
 
-			  The Secrets we provided to the repo earlier comes into use in this script.
+There are 3 parts of the .yml file to configure:
 
-			  There are 3 parts of the .yml file to configure:
+1. The aws-region should be the same region as where you have created your EC2 instance. (If you do not know, check the top left of your EC2 console to confirm the region you are in).
+2. working-directory should be the directory where you created the deploy.sh script.
+3. command should be the command you would like the SSM agent to run.
 
-			  1. The aws-region should be the same region as where you have created your EC2 instance. (If you do not know, check the top left of your EC2 console to confirm the region you are in).
-			  2. working-directory should be the directory where you created the deploy.sh script.
-			  3. command should be the command you would like the SSM agent to run.
+Once this is complete, commit and push the workflow to your repo.
 
-			  Once this is complete, commit and push the workflow to your repo.
-
-			  ---
+---
 
 ## Setting up your Domain
 
