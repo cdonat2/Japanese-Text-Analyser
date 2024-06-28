@@ -1,4 +1,4 @@
-name: Deploy using AWS SSM Send-Command
+name: Run Script on AWS EC2
 
 on:
   push:
@@ -6,25 +6,23 @@ on:
       - main
 
 jobs:
-  start:
+  run-script-on-ec2:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v2
+    - name: Checkout project
+      uses: actions/checkout@v2
 
-      - name: AWS SSM Send Command
-        uses: peterkimzz/aws-ssm-send-command@master
-        id: ssm
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-          instance-ids: ${{ secrets.INSTANCE_ID }}
+    - name: Create identifier file
+      env:
+        ACTIONS_RUNNER_DEBUG: false
+      run: echo "${{ secrets.EC2_SSH_KEY }}" > japanese_text_analyser.pem
 
-          comment: Deploy main branch
-          working-directory: /home/ubuntu/japanese_text_analyser
-          command: /bin/sh ./deploy.sh
+    - name: Set file permissions
+      run: chmod 600 japanese_text_analyser.pem
 
-      # Catch SSM outputs
-      - name: Get output
-        run: echo "The Command id is ${{ steps.ssm.outputs.command-id }}"
+    - name: Connect to server and restart website
+      run: |
+        ssh -o StrictHostKeyChecking=no -i japanese_text_analyser.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_INSTANCE }} '
+        cd japanese_text_analyser && 
+        source japanese_text_analyser_env/bin/activate && 
+        chmod +x ./deploy.sh && yes | ./deploy.sh'

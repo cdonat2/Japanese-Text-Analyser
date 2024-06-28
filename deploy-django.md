@@ -670,7 +670,8 @@ Now if you go to your Elastic IP on your browser it should show the app!
 ---
 
 ## Setting up Continuous Deployment
-
+does not work:
+https://www.youtube.com/watch?v=oCu3_JKsYYc
 Continuous Deployment is helpful because it saves you the time of having to ssh into your EC2 instance each time you make an update on your codebase. 
 
 In this project, we will be using a Github Action called [AWS SSM Send-Command](https://github.com/marketplace/actions/aws-ssm-send-command) created by **peterkimzz** to implement auto-deployment.
